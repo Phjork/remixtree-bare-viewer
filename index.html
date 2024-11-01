@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scratch Remix Tree</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        input {
+            padding: 8px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 8px 12px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Scratch Remix Tree</h1>
+    <input type="text" id="projectIdInput" placeholder="Enter Project ID">
+    <button onclick="fetchAndInsertRemixTreeData()">Fetch Remix Tree</button>
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Creator</th>
+                <th>Date</th>
+                <th>Depth in Remix Tree</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data will be inserted here -->
+        </tbody>
+    </table>
+
+    <script>
+        // Function to convert Unix timestamp to a readable date
+        function convertUnixTimestamp(timestamp) {
+            console.log('Original timestamp:', timestamp);
+            const parsedTimestamp = Number(timestamp);
+            console.log('Parsed timestamp:', parsedTimestamp);
+            if (!isNaN(parsedTimestamp) && parsedTimestamp > 0) {
+                const date = new Date(parsedTimestamp);
+                console.log('Date object:', date);
+                return date.toLocaleString();
+            }
+            return 'Invalid Date';
+        }
+
+        async function fetchAndInsertRemixTreeData() {
+            const projectId = document.getElementById('projectIdInput').value;
+            const url = `https://scratch.mit.edu/projects/${projectId}/remixtree/bare/`;
+            
+            try {
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Log the fetched data to inspect its structure
+                console.log('Fetched data:', data);
+                
+                // Insert data directly into the table
+                const tableBody = document.querySelector('#dataTable tbody');
+                tableBody.innerHTML = ''; // Clear existing data
+
+                // Function to calculate depth in the remix tree
+                function calculateDepth(remix, depth = 0) {
+                    remix.depth = depth;
+                    if (remix.children && remix.children.length > 0) {
+                        remix.children.forEach(childId => {
+                            if (data[childId]) {
+                                data[childId].depth = depth + 1;
+                                calculateDepth(data[childId], depth + 1);
+                            }
+                        });
+                    }
+                }
+
+                // Calculate depth for the root project and its children
+                if (data.root_id && data[data.root_id]) {
+                    calculateDepth(data[data.root_id]);
+                }
+
+                // Process and insert each remix entry
+                for (const key in data) {
+                    if (data.hasOwnProperty(key) && key !== 'root_id') {
+                        const remix = data[key];
+                        console.log('Processing remix:', remix);
+
+                        // Convert Unix timestamp to date and time
+                        let date = 'N/A';
+                        if (remix.datetime_created && remix.datetime_created.hasOwnProperty('$date')) {
+                            date = convertUnixTimestamp(remix.datetime_created.$date);
+                            console.log('Converted date:', date);
+                        }
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${key}</td>
+                            <td>${remix.title || 'N/A'}</td>
+                            <td>${remix.username || 'N/A'}</td>
+                            <td>${date}</td>
+                            <td>${remix.depth !== undefined ? remix.depth : 'N/A'}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching remix tree data:', error);
+            }
+        }
+    </script>
+</body>
+</html>
